@@ -95,7 +95,6 @@ export default function DocumentDetail() {
         setDoc(docData);
 
         const allSessions = await fetchAPI('/assistant/sessions');
-        // Filter ONLY sessions related to this specific document
         const filteredSessions = allSessions.filter((s: any) => s.document_id === id && !s.is_archived);
         setDocSessions(filteredSessions);
         
@@ -161,7 +160,7 @@ export default function DocumentDetail() {
   const switchSession = async (targetSessionId: string) => {
     if (targetSessionId === sessionId) return;
     setSessionId(targetSessionId);
-    setChatMessages([]); // Clear immediately for UX
+    setChatMessages([]); 
     try {
       const msgs = await fetchAPI(`/assistant/sessions/${targetSessionId}/messages`);
       setChatMessages(msgs);
@@ -212,7 +211,6 @@ export default function DocumentDetail() {
       const updatedMessages = await fetchAPI(`/assistant/sessions/${targetSessionId}/messages`);
       setChatMessages(updatedMessages);
 
-      // Auto-rename session if it's the first message
       if (isFirstMessage) {
         const aiResponse = updatedMessages.find((m: any) => m.role === 'assistant');
         if (aiResponse) {
@@ -224,7 +222,6 @@ export default function DocumentDetail() {
               method: 'PATCH', body: JSON.stringify({ title: generatedTitle }) 
           });
           
-          // Refresh the session list quietly to get the new title
           const updatedSessions = await fetchAPI('/assistant/sessions');
           setDocSessions(updatedSessions.filter((s: any) => s.document_id === doc.id && !s.is_archived));
         }
@@ -238,10 +235,10 @@ export default function DocumentDetail() {
     }
   };
 
-  // --- REUSABLE CHAT WORKSPACE (WITH PREMIUM MARKDOWN) ---
+  // --- REUSABLE CHAT WORKSPACE (BULLETPROOF RESPONSIVE) ---
   const renderChatWorkspace = () => (
-    <div className="flex flex-col h-full bg-white dark:bg-[#050505] overflow-hidden">
-      <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-6 sleek-scrollbar min-h-0">
+    <div className="flex flex-col flex-1 h-full bg-white dark:bg-[#050505] overflow-hidden min-w-0 min-h-0 w-full">
+      <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-6 sleek-scrollbar min-h-0 min-w-0 w-full">
         {chatMessages.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center text-center opacity-60">
             <div className="h-12 w-12 rounded-xl bg-neutral-100 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 flex items-center justify-center mb-4">
@@ -253,62 +250,70 @@ export default function DocumentDetail() {
             </p>
           </div>
         ) : (
-          chatMessages.map((msg, idx) => (
-            <div key={msg.id || idx} className={`flex gap-3 ${msg.role === 'user' ? 'justify-end' : 'justify-start'} animate-in fade-in slide-in-from-bottom-2 duration-300`}>
-              {msg.role === 'assistant' && (
-                <div className="h-7 w-7 rounded-full bg-neutral-100 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 flex items-center justify-center shrink-0 mt-0.5">
-                  <Sparkles className="h-3.5 w-3.5 text-black dark:text-white" />
-                </div>
-              )}
-              <div className={`max-w-[92%] flex flex-col gap-1 ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
-                <div className={`px-4 py-3 text-[14px] leading-relaxed overflow-hidden ${
-                  msg.role === 'user' 
-                    ? 'bg-black text-white dark:bg-white dark:text-black rounded-2xl rounded-tr-sm font-medium whitespace-pre-wrap shadow-sm' 
-                    : 'bg-transparent text-neutral-900 dark:text-neutral-100 w-full'
-                }`}>
-                  {msg.role === 'assistant' ? (
-                    <ReactMarkdown 
-                      remarkPlugins={[remarkGfm]}
-                      components={{
-                        h1: ({node, ...props}) => <h1 className="text-lg font-bold mt-4 mb-2 text-black dark:text-white tracking-tight border-b border-neutral-200 dark:border-neutral-800 pb-1" {...props} />,
-                        h2: ({node, ...props}) => <h2 className="text-md font-semibold mt-3 mb-2 text-black dark:text-white tracking-tight" {...props} />,
-                        h3: ({node, ...props}) => <h3 className="text-[15px] font-medium mt-3 mb-1 text-neutral-800 dark:text-neutral-200" {...props} />,
-                        p: ({node, ...props}) => <p className="leading-relaxed mb-3 last:mb-0" {...props} />,
-                        strong: ({node, ...props}) => <strong className="font-semibold text-black dark:text-white" {...props} />,
-                        a: ({node, ...props}) => <a className="text-purple-600 dark:text-purple-400 font-medium hover:underline underline-offset-2" {...props} />,
-                        ul: ({node, ...props}) => <ul className="list-disc list-outside ml-4 space-y-1 mb-3 text-neutral-700 dark:text-neutral-300 marker:text-neutral-400" {...props} />,
-                        ol: ({node, ...props}) => <ol className="list-decimal list-outside ml-4 space-y-1 mb-3 text-neutral-700 dark:text-neutral-300 marker:text-neutral-400 font-medium" {...props} />,
-                        li: ({node, ...props}) => <li className="pl-1" {...props} />,
-                        blockquote: ({node, ...props}) => <blockquote className="border-l-4 border-neutral-300 dark:border-neutral-700 pl-3 py-0.5 italic text-neutral-500 dark:text-neutral-400 my-4 bg-neutral-50 dark:bg-neutral-900/50 rounded-r-lg" {...props} />,
-                        pre: ({node, ...props}) => <pre className="p-3 rounded-xl bg-neutral-900 dark:bg-[#111] text-neutral-100 border border-neutral-800 overflow-x-auto my-3 shadow-sm sleek-scrollbar text-[13px]" {...props} />,
-                        code: ({node, inline, ...props}: any) => 
-                          inline 
-                            ? <code className="bg-neutral-100 dark:bg-neutral-800 text-black dark:text-white px-1.5 py-0.5 rounded-md text-[13px] font-mono border border-neutral-200 dark:border-neutral-700" {...props} /> 
-                            : <code className="text-[13px] font-mono leading-relaxed" {...props} />,
-                        table: ({node, ...props}) => (
-                          <div className="w-full overflow-x-auto my-4 rounded-xl border border-neutral-200 dark:border-neutral-800 shadow-sm bg-white dark:bg-[#0A0A0A]">
-                            <table className="w-full text-sm text-left border-collapse" {...props} />
-                          </div>
-                        ),
-                        thead: ({node, ...props}) => <thead className="text-xs uppercase bg-neutral-50 dark:bg-[#111] text-neutral-500 dark:text-neutral-400 font-semibold tracking-wider border-b border-neutral-200 dark:border-neutral-800" {...props} />,
-                        th: ({node, ...props}) => <th className="px-4 py-3 font-semibold whitespace-nowrap" {...props} />,
-                        td: ({node, ...props}) => <td className="px-4 py-3 border-b border-neutral-100 dark:border-neutral-800/50 last:border-0 text-neutral-700 dark:text-neutral-300" {...props} />,
-                        tr: ({node, ...props}) => <tr className="hover:bg-neutral-50/50 dark:hover:bg-neutral-900/50 transition-colors" {...props} />,
-                      }}
-                    >
-                      {msg.content}
-                    </ReactMarkdown>
-                  ) : (
-                    msg.content
-                  )}
+          <div className="w-full space-y-6 min-w-0">
+            {chatMessages.map((msg, idx) => (
+              <div key={msg.id || idx} className={`flex gap-3 ${msg.role === 'user' ? 'justify-end' : 'justify-start'} animate-in fade-in slide-in-from-bottom-2 duration-300 min-w-0 w-full`}>
+                {msg.role === 'assistant' && (
+                  <div className="h-7 w-7 rounded-full bg-neutral-100 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 flex items-center justify-center shrink-0 mt-0.5">
+                    <Sparkles className="h-3.5 w-3.5 text-black dark:text-white" />
+                  </div>
+                )}
+                <div className={`max-w-[92%] sm:max-w-[88%] flex flex-col gap-1 min-w-0 ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
+                  <div className={`px-4 py-3 text-[14px] leading-relaxed overflow-hidden break-words w-full ${
+                    msg.role === 'user' 
+                      ? 'bg-black text-white dark:bg-white dark:text-black rounded-2xl rounded-tr-sm font-medium whitespace-pre-wrap shadow-sm' 
+                      : 'bg-transparent text-neutral-900 dark:text-neutral-100'
+                  }`}>
+                    {msg.role === 'assistant' ? (
+                      <div className="prose prose-sm prose-neutral dark:prose-invert max-w-none break-words w-full overflow-hidden">
+                        <ReactMarkdown 
+                          remarkPlugins={[remarkGfm]}
+                          components={{
+                            h1: ({node, ...props}) => <h1 className="text-lg font-bold mt-4 mb-2 text-black dark:text-white tracking-tight border-b border-neutral-200 dark:border-neutral-800 pb-1" {...props} />,
+                            h2: ({node, ...props}) => <h2 className="text-md font-semibold mt-3 mb-2 text-black dark:text-white tracking-tight" {...props} />,
+                            h3: ({node, ...props}) => <h3 className="text-[15px] font-medium mt-3 mb-1 text-neutral-800 dark:text-neutral-200" {...props} />,
+                            p: ({node, ...props}) => <p className="leading-relaxed mb-3 last:mb-0" {...props} />,
+                            strong: ({node, ...props}) => <strong className="font-semibold text-black dark:text-white" {...props} />,
+                            a: ({node, ...props}) => <a className="text-purple-600 dark:text-purple-400 font-medium hover:underline underline-offset-2 break-all" {...props} />,
+                            ul: ({node, ...props}) => <ul className="list-disc list-outside ml-4 space-y-1 mb-3 text-neutral-700 dark:text-neutral-300 marker:text-neutral-400" {...props} />,
+                            ol: ({node, ...props}) => <ol className="list-decimal list-outside ml-4 space-y-1 mb-3 text-neutral-700 dark:text-neutral-300 marker:text-neutral-400 font-medium" {...props} />,
+                            li: ({node, ...props}) => <li className="pl-1" {...props} />,
+                            blockquote: ({node, ...props}) => <blockquote className="border-l-4 border-neutral-300 dark:border-neutral-700 pl-3 py-0.5 italic text-neutral-500 dark:text-neutral-400 my-4 bg-neutral-50 dark:bg-neutral-900/50 rounded-r-lg" {...props} />,
+                            pre: ({node, ...props}) => (
+                              <div className="w-full max-w-full overflow-x-auto my-3 rounded-xl border border-neutral-800 shadow-sm sleek-scrollbar bg-neutral-900 dark:bg-[#111]">
+                                <pre className="p-3 text-neutral-100 text-[12px] sm:text-[13px] bg-transparent m-0 w-max min-w-full" {...props} />
+                              </div>
+                            ),
+                            code: ({node, inline, ...props}: any) => 
+                              inline 
+                                ? <code className="bg-neutral-100 dark:bg-neutral-800 text-black dark:text-white px-1.5 py-0.5 rounded-md text-[12px] sm:text-[13px] font-mono border border-neutral-200 dark:border-neutral-700 break-words" {...props} /> 
+                                : <code className="text-[12px] sm:text-[13px] font-mono leading-relaxed" {...props} />,
+                            table: ({node, ...props}) => (
+                              <div className="w-full max-w-full overflow-x-auto my-4 rounded-xl border border-neutral-200 dark:border-neutral-800 shadow-sm bg-white dark:bg-[#0A0A0A]">
+                                <table className="w-full text-sm text-left border-collapse min-w-max" {...props} />
+                              </div>
+                            ),
+                            thead: ({node, ...props}) => <thead className="text-xs uppercase bg-neutral-50 dark:bg-[#111] text-neutral-500 dark:text-neutral-400 font-semibold tracking-wider border-b border-neutral-200 dark:border-neutral-800" {...props} />,
+                            th: ({node, ...props}) => <th className="px-4 py-3 font-semibold whitespace-nowrap" {...props} />,
+                            td: ({node, ...props}) => <td className="px-4 py-3 border-b border-neutral-100 dark:border-neutral-800/50 last:border-0 text-neutral-700 dark:text-neutral-300" {...props} />,
+                            tr: ({node, ...props}) => <tr className="hover:bg-neutral-50/50 dark:hover:bg-neutral-900/50 transition-colors" {...props} />,
+                          }}
+                        >
+                          {msg.content}
+                        </ReactMarkdown>
+                      </div>
+                    ) : (
+                      msg.content
+                    )}
+                  </div>
                 </div>
               </div>
-            </div>
-          ))
+            ))}
+          </div>
         )}
         
         {isGenerating && (
-          <div className="flex gap-3 animate-in fade-in duration-300">
+          <div className="flex gap-3 animate-in fade-in duration-300 min-w-0 w-full">
             <div className="h-7 w-7 rounded-full bg-neutral-100 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 flex items-center justify-center shrink-0 mt-0.5">
               <Sparkles className="h-3.5 w-3.5 text-black dark:text-white animate-pulse" />
             </div>
@@ -320,8 +325,8 @@ export default function DocumentDetail() {
         <div ref={messagesEndRef} className="h-2" />
       </div>
 
-      <div className="shrink-0 p-4 pb-8 lg:pb-4 border-t border-neutral-200 dark:border-neutral-800/60 bg-white dark:bg-[#050505]">
-        <div className="relative flex items-end bg-neutral-50 dark:bg-[#111] border border-neutral-200 dark:border-neutral-800 rounded-xl focus-within:border-neutral-400 dark:focus-within:border-neutral-600 focus-within:ring-1 focus-within:ring-neutral-400 dark:focus-within:ring-neutral-600 transition-all overflow-hidden p-1.5 shadow-sm">
+      <div className="shrink-0 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] lg:pb-4 border-t border-neutral-200 dark:border-neutral-800/60 bg-white dark:bg-[#050505] min-w-0 w-full z-10">
+        <div className="relative flex items-end bg-neutral-50 dark:bg-[#111] border border-neutral-200 dark:border-neutral-800 rounded-2xl focus-within:border-neutral-400 dark:focus-within:border-neutral-600 focus-within:ring-1 focus-within:ring-neutral-400 dark:focus-within:ring-neutral-600 transition-all overflow-hidden p-1.5 shadow-sm">
           <textarea
             ref={textareaRef}
             value={chatInput}
@@ -340,7 +345,7 @@ export default function DocumentDetail() {
             onClick={handleSendMessage} 
             disabled={!chatInput.trim() || isGenerating}
             size="icon"
-            className={`h-8 w-8 shrink-0 mb-0.5 mr-0.5 rounded-lg transition-all ${
+            className={`h-8 w-8 shrink-0 mb-0.5 mr-0.5 rounded-xl transition-all ${
               chatInput.trim() && !isGenerating 
                 ? 'bg-purple-600 hover:bg-purple-700 text-white' 
                 : 'bg-neutral-200 dark:bg-neutral-800 text-neutral-400 dark:text-neutral-600'
@@ -356,7 +361,7 @@ export default function DocumentDetail() {
 
   if (loading) {
     return (
-      <div className="flex flex-col h-full w-full items-center justify-center bg-white dark:bg-black">
+      <div className="fixed inset-0 flex flex-col items-center justify-center bg-white dark:bg-black z-50">
         <Loader2 className="h-8 w-8 animate-spin text-black dark:text-white" />
         <p className="mt-4 text-neutral-500 font-medium">Loading workspace...</p>
       </div>
@@ -376,26 +381,25 @@ export default function DocumentDetail() {
         .dark .sleek-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(82, 82, 91, 0.7); }
       `}</style>
 
-      <div className="flex flex-col h-full w-full bg-neutral-50 dark:bg-black overflow-hidden font-sans relative">
+      <div className="fixed inset-0 flex flex-col w-full bg-neutral-50 dark:bg-black overflow-hidden overscroll-none font-sans z-50">
         
-        {/* IFRAME SHIELD */}
         {isResizing && <div className="absolute inset-0 z-50 cursor-col-resize bg-transparent" />}
 
         {/* --- HEADER --- */}
         <div className="shrink-0 h-14 px-3 sm:px-6 border-b border-neutral-200 dark:border-neutral-800 bg-white dark:bg-[#0A0A0A] flex items-center justify-between z-20">
-          <div className="flex items-center gap-3 overflow-hidden">
+          <div className="flex items-center gap-3 overflow-hidden min-w-0">
             <Button variant="ghost" size="icon" onClick={() => navigate('/dashboard/drive')} className="shrink-0 h-8 w-8 text-neutral-600 dark:text-neutral-400 hover:text-black dark:hover:text-white">
               <ArrowLeft className="h-4 w-4" />
             </Button>
-            <div className="h-4 w-px bg-neutral-200 dark:bg-neutral-800 hidden sm:block"></div>
-            <div className="flex items-center gap-2.5 overflow-hidden">
+            <div className="h-4 w-px bg-neutral-200 dark:bg-neutral-800 hidden sm:block shrink-0"></div>
+            <div className="flex items-center gap-2.5 overflow-hidden min-w-0">
               <div className="p-1.5 rounded bg-neutral-100 dark:bg-neutral-900 text-neutral-500 shrink-0">
                 <FileText className="h-4 w-4" />
               </div>
               <h1 className="text-[14px] sm:text-[15px] font-semibold tracking-tight text-black dark:text-white truncate max-w-[160px] sm:max-w-md" title={doc.original_name}>
                 {doc.original_name}
               </h1>
-              <Badge variant="secondary" className="hidden sm:inline-flex bg-neutral-100 text-neutral-600 dark:bg-neutral-900 dark:text-neutral-300 border border-neutral-200 dark:border-neutral-800 uppercase tracking-wider text-[10px] font-bold">
+              <Badge variant="secondary" className="hidden sm:inline-flex shrink-0 bg-neutral-100 text-neutral-600 dark:bg-neutral-900 dark:text-neutral-300 border border-neutral-200 dark:border-neutral-800 uppercase tracking-wider text-[10px] font-bold">
                 {doc.extension}
               </Badge>
             </div>
@@ -412,7 +416,7 @@ export default function DocumentDetail() {
         </div>
 
         {/* --- CONTENT SPLIT --- */}
-        <div className="flex-1 flex w-full min-h-0 overflow-hidden relative">
+        <div className="flex-1 flex w-full min-h-0 min-w-0 overflow-hidden relative">
           
           {/* LEFT: THE VIEWER */}
           <div className={`flex-1 bg-neutral-100 dark:bg-[#020202] relative min-w-0 h-full ${isFullscreen ? 'hidden' : 'block'}`}>
@@ -435,7 +439,7 @@ export default function DocumentDetail() {
           {/* RIGHT: DESKTOP RESIZABLE SIDEBAR */}
           <div 
             style={{ width: isFullscreen ? '100%' : `${sidebarWidth}px` }}
-            className="shrink-0 border-l border-neutral-200 dark:border-neutral-800 bg-white dark:bg-[#050505] flex-col hidden lg:flex shadow-[-4px_0_24px_rgba(0,0,0,0.02)] z-10 h-full overflow-hidden relative transition-[width] duration-75"
+            className="shrink-0 border-l border-neutral-200 dark:border-neutral-800 bg-white dark:bg-[#050505] flex-col hidden lg:flex shadow-[-4px_0_24px_rgba(0,0,0,0.02)] z-10 h-full overflow-hidden relative transition-[width] duration-75 min-w-0"
           >
             {/* DRAG HANDLE */}
             {!isFullscreen && (
@@ -509,13 +513,14 @@ export default function DocumentDetail() {
             </div>
             
             {/* Chat Area */}
-            <div className="flex-1 overflow-hidden">
+            <div className="flex-1 overflow-hidden min-w-0 min-h-0 w-full flex flex-col">
               {renderChatWorkspace()}
             </div>
           </div>
 
           {/* MOBILE FLOATING ACTION BUTTON */}
-          <div className="lg:hidden absolute bottom-24 right-4 z-30">
+          {/* FIX: Moved FAB to top right corner, perfectly clearing the header and bottom URL bars */}
+          <div className="lg:hidden absolute top-20 right-4 z-30">
             <Sheet open={isMobileChatOpen} onOpenChange={setIsMobileChatOpen}>
               <SheetTrigger asChild>
                 <Button className="h-14 pl-5 pr-6 rounded-full bg-purple-600 hover:bg-purple-700 text-white shadow-[0_8px_30px_rgb(147,51,234,0.4)] hover:scale-105 transition-transform flex items-center gap-2">
@@ -525,13 +530,14 @@ export default function DocumentDetail() {
               </SheetTrigger>
               <SheetContent 
                 side="bottom" 
-                className={`${isMobileFullscreen ? 'h-[100dvh] rounded-none' : 'h-[85dvh] rounded-t-2xl'} p-0 flex flex-col bg-white dark:bg-[#050505] border-t border-neutral-200 dark:border-neutral-800 outline-none transition-all duration-300 w-full !max-w-full [&>button]:hidden`}
+                className={`${isMobileFullscreen ? 'h-[100dvh] max-h-[100dvh] rounded-none' : 'h-[85dvh] max-h-[85dvh] rounded-t-2xl'} p-0 flex flex-col bg-white dark:bg-[#050505] border-t border-neutral-200 dark:border-neutral-800 outline-none transition-all duration-300 w-full !max-w-full [&>button]:hidden min-w-0 min-h-0`}
               >
-                <SheetHeader className="p-4 border-b border-neutral-200 dark:border-neutral-800 text-left shrink-0 flex flex-row items-center justify-between">
-                  <SheetTitle className="text-black dark:text-white flex items-center gap-2 text-[15px] m-0">
-                    <Sparkles className="h-4 w-4 text-purple-600" /> Intelligence
+                <SheetHeader className="p-4 border-b border-neutral-200 dark:border-neutral-800 text-left shrink-0 flex flex-row items-center justify-between min-w-0">
+                  <SheetTitle className="text-black dark:text-white flex items-center gap-2 text-[15px] m-0 min-w-0">
+                    <Sparkles className="h-4 w-4 text-purple-600 shrink-0" /> 
+                    <span className="truncate">Docmosiss</span>
                   </SheetTitle>
-                  <div className="flex items-center gap-1">
+                  <div className="flex items-center gap-1 shrink-0">
                     
                     {/* MOBILE HISTORY DROPDOWN */}
                     <DropdownMenu>
@@ -540,7 +546,7 @@ export default function DocumentDetail() {
                           <History className="h-4 w-4" />
                         </Button>
                       </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-56 dark:bg-[#111] border-neutral-200 dark:border-neutral-800 rounded-xl">
+                      <DropdownMenuContent align="end" className="w-56 dark:bg-[#111] border-neutral-200 dark:border-neutral-800 rounded-xl z-[100]">
                         <div className="px-2 py-1.5 text-[11px] font-bold text-neutral-400 dark:text-neutral-500 uppercase tracking-widest">Past Conversations</div>
                         {docSessions.length === 0 ? (
                           <div className="p-3 text-xs text-neutral-500 text-center italic">No history found.</div>
@@ -570,7 +576,7 @@ export default function DocumentDetail() {
                     </Button>
                   </div>
                 </SheetHeader>
-                <div className="flex-1 overflow-hidden">
+                <div className="flex-1 overflow-hidden min-w-0 min-h-0 w-full flex flex-col">
                   {renderChatWorkspace()}
                 </div>
               </SheetContent>

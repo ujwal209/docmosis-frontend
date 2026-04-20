@@ -3,7 +3,7 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import { 
   Send, Globe, BrainCircuit, MoreVertical, 
   Trash2, Archive, ArchiveRestore, Edit2, Copy, ThumbsUp, ThumbsDown, 
-  Plus, MessageSquare, Share2, Loader2, Check, ArrowLeft, History, Sparkles
+  Plus, MessageSquare, Share2, Loader2, Check, ArrowLeft, History, Sparkles, X
 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
@@ -116,7 +116,6 @@ export default function Assistant() {
     const isFirstMessage = messages.length === 0;
     let targetSessionId = activeSessionId;
     
-    // Create session if none exists
     if (!targetSessionId) {
       try {
         const newSession = await fetchAPI('/assistant/sessions', {
@@ -134,7 +133,6 @@ export default function Assistant() {
     setIsGenerating(true);
 
     try {
-      // 1. Send the message
       await fetchAPI('/assistant/chat', {
         method: 'POST',
         body: JSON.stringify({
@@ -143,15 +141,12 @@ export default function Assistant() {
         })
       });
       
-      // 2. Fetch the updated messages to get the AI response
       const updatedMessages = await fetchAPI(`/assistant/sessions/${targetSessionId}/messages`);
       setMessages(updatedMessages);
       
-      // 3. Auto-Rename Session based on AI's first response
       if (isFirstMessage) {
           const aiResponse = updatedMessages.find((m: any) => m.role === 'assistant');
           if (aiResponse) {
-              // Clean Markdown characters and grab the first ~35 characters
               let cleanText = aiResponse.content.replace(/[*#_`~]/g, '').replace(/\n/g, ' ').trim();
               let generatedTitle = cleanText.substring(0, 35);
               if (cleanText.length > 35) generatedTitle += "...";
@@ -160,7 +155,7 @@ export default function Assistant() {
                   method: 'PATCH', 
                   body: JSON.stringify({ title: generatedTitle }) 
               });
-              loadSessions(); // Refresh sidebar to show new title
+              loadSessions(); 
           }
       }
 
@@ -219,7 +214,6 @@ export default function Assistant() {
     } catch (err) { console.error("Failed to restore", err); }
   };
 
-  // REMOVED WINDOW.CONFIRM FROM DELETE SESSION
   const deleteSession = async (id: string) => {
     try {
       await fetchAPI(`/assistant/sessions/${id}`, { method: 'DELETE' });
@@ -235,7 +229,6 @@ export default function Assistant() {
   // --- SHARED HISTORY LIST COMPONENT ---
   const HistoryList = () => (
     <div className="flex-1 overflow-y-auto mt-4 pr-2 custom-scrollbar space-y-6 pb-20">
-      {/* ARCHIVED SESSIONS */}
       {archivedSessions.length > 0 && (
         <div>
           <h3 className="text-[11px] font-bold text-neutral-400 dark:text-neutral-500 uppercase tracking-widest mb-3 px-2">Archived</h3>
@@ -262,7 +255,6 @@ export default function Assistant() {
         </div>
       )}
 
-      {/* ACTIVE SESSIONS */}
       <div>
         <h3 className="text-[11px] font-bold text-neutral-400 dark:text-neutral-500 uppercase tracking-widest mb-3 px-2">Conversations</h3>
         {activeSessions.length === 0 ? (
@@ -316,9 +308,13 @@ export default function Assistant() {
                 <History className="h-4 w-4 mr-2" /> History
               </Button>
             </SheetTrigger>
-            <SheetContent side="left" className="w-[80%] sm:w-80 p-4 flex flex-col bg-white dark:bg-[#0A0A0A] border-r border-neutral-200 dark:border-neutral-800">
-              <SheetHeader className="text-left mb-4">
+            {/* HIDE DEFAULT CLOSE BUTTON TO PREVENT DOUBLE X */}
+            <SheetContent side="left" className="w-[80%] sm:w-80 p-4 flex flex-col bg-white dark:bg-[#0A0A0A] border-r border-neutral-200 dark:border-neutral-800 [&>button]:hidden">
+              <SheetHeader className="text-left mb-4 flex flex-row items-center justify-between">
                 <SheetTitle className="text-black dark:text-white">Chat History</SheetTitle>
+                <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full" onClick={() => setIsHistoryOpen(false)}>
+                  <X className="h-4 w-4" />
+                </Button>
               </SheetHeader>
               <Button onClick={createNewSession} className="w-full bg-black hover:bg-neutral-800 text-white dark:bg-white dark:text-black dark:hover:bg-neutral-200 transition-all font-medium">
                 <Plus className="h-4 w-4 mr-2" /> Start New Chat
@@ -330,7 +326,8 @@ export default function Assistant() {
       </header>
 
       {/* --- MAIN LAYOUT --- */}
-      <div className="flex-1 flex overflow-hidden relative">
+      {/* FIX: w-full and min-w-0 applied to absolutely guarantee flex items do not expand past screen width */}
+      <div className="flex-1 flex overflow-hidden relative w-full min-w-0">
         
         {/* DESKTOP SIDEBAR */}
         <div className="w-64 shrink-0 flex-col hidden sm:flex border-r border-neutral-200 dark:border-neutral-800 bg-neutral-50/50 dark:bg-[#0A0A0A] p-4">
@@ -341,9 +338,10 @@ export default function Assistant() {
         </div>
 
         {/* CHAT WORKSPACE */}
-        <div className="flex-1 flex flex-col h-full relative bg-transparent">
+        {/* FIX: min-w-0 stops the inner markdown from blowing out the width */}
+        <div className="flex-1 flex flex-col h-full relative bg-transparent min-w-0 w-full">
           
-          <div className="flex-1 overflow-y-auto pb-[calc(10rem+env(safe-area-inset-bottom))] sm:pb-40 custom-scrollbar relative">
+          <div className="flex-1 overflow-y-auto pb-[calc(10rem+env(safe-area-inset-bottom))] sm:pb-40 custom-scrollbar relative min-w-0 w-full">
             {messages.length === 0 ? (
               <div className="h-full flex flex-col items-center justify-center text-center p-6 sm:p-8 relative z-10 animate-in fade-in duration-700">
                 <div className="h-16 w-16 bg-neutral-100 dark:bg-neutral-900 rounded-2xl flex items-center justify-center mb-6 border border-neutral-200 dark:border-neutral-800">
@@ -357,9 +355,9 @@ export default function Assistant() {
                 </p>
               </div>
             ) : (
-              <div className="max-w-4xl mx-auto w-full py-8 px-4 sm:px-6 space-y-8 relative z-10">
+              <div className="max-w-4xl mx-auto w-full py-8 px-4 sm:px-6 space-y-8 relative z-10 min-w-0">
                 {messages.map((msg, idx) => (
-                  <div key={msg.id || idx} className={`flex gap-3 sm:gap-4 ${msg.role === 'user' ? 'justify-end' : 'justify-start'} group animate-in slide-in-from-bottom-2 duration-300`}>
+                  <div key={msg.id || idx} className={`flex gap-3 sm:gap-4 ${msg.role === 'user' ? 'justify-end' : 'justify-start'} group animate-in slide-in-from-bottom-2 duration-300 w-full min-w-0`}>
                     
                     {msg.role === 'assistant' && (
                       <div className="h-8 w-8 rounded-full bg-neutral-100 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 flex items-center justify-center shrink-0 mt-0.5 shadow-sm">
@@ -367,7 +365,8 @@ export default function Assistant() {
                       </div>
                     )}
 
-                    <div className={`max-w-[95%] md:max-w-[95%] lg:max-w-[90%] flex flex-col gap-2 ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
+                    {/* FIX: Reduced max-w to 90% and ensured min-w-0 applies to bubble */}
+                    <div className={`max-w-[90%] sm:max-w-[85%] md:max-w-[80%] flex flex-col gap-2 min-w-0 ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
                       
                       {editingMessageId === msg.id && msg.role === 'user' ? (
                         <div className="w-full min-w-[280px] sm:min-w-[400px] bg-white dark:bg-[#111] p-3 rounded-2xl border border-neutral-200 dark:border-neutral-800 shadow-lg space-y-3">
@@ -384,13 +383,15 @@ export default function Assistant() {
                           </div>
                         </div>
                       ) : (
-                        <div className={`px-5 py-3.5 text-[15px] leading-relaxed overflow-hidden ${
+                        // FIX: Added break-words and w-full to guarantee text wraps and never expands beyond screen
+                        <div className={`px-5 py-3.5 text-[15px] leading-relaxed overflow-hidden break-words w-full ${
                           msg.role === 'user' 
                             ? 'bg-black text-white dark:bg-white dark:text-black rounded-3xl rounded-tr-sm shadow-sm font-medium whitespace-pre-wrap' 
-                            : 'bg-transparent text-neutral-900 dark:text-neutral-100 w-full'
+                            : 'bg-transparent text-neutral-900 dark:text-neutral-100'
                         }`}>
                           {msg.role === 'assistant' ? (
-                            <div className="prose prose-neutral dark:prose-invert max-w-none">
+                            <div className="prose prose-neutral dark:prose-invert max-w-none break-words w-full overflow-hidden">
+                              {/* --- BOMB-PROOF RESPONSIVE MARKDOWN MAPPING --- */}
                               <ReactMarkdown 
                                 remarkPlugins={[remarkGfm]}
                                 components={{
@@ -399,18 +400,24 @@ export default function Assistant() {
                                   h3: ({node, ...props}) => <h3 className="text-lg font-medium mt-4 mb-2 text-neutral-800 dark:text-neutral-200" {...props} />,
                                   p: ({node, ...props}) => <p className="leading-relaxed mb-4 last:mb-0" {...props} />,
                                   strong: ({node, ...props}) => <strong className="font-semibold text-black dark:text-white" {...props} />,
-                                  a: ({node, ...props}) => <a className="text-blue-600 dark:text-blue-400 font-medium hover:underline underline-offset-2" {...props} />,
+                                  a: ({node, ...props}) => <a className="text-blue-600 dark:text-blue-400 font-medium hover:underline underline-offset-2 break-all" {...props} />,
                                   ul: ({node, ...props}) => <ul className="list-disc list-outside ml-5 space-y-1.5 mb-4 text-neutral-700 dark:text-neutral-300 marker:text-neutral-400" {...props} />,
                                   ol: ({node, ...props}) => <ol className="list-decimal list-outside ml-5 space-y-1.5 mb-4 text-neutral-700 dark:text-neutral-300 marker:text-neutral-400 font-medium" {...props} />,
                                   li: ({node, ...props}) => <li className="pl-1" {...props} />,
                                   blockquote: ({node, ...props}) => <blockquote className="border-l-4 border-neutral-300 dark:border-neutral-700 pl-4 py-1 italic text-neutral-500 dark:text-neutral-400 my-5 bg-neutral-50 dark:bg-neutral-900/50 rounded-r-lg" {...props} />,
-                                  pre: ({node, ...props}) => <pre className="p-4 rounded-xl bg-neutral-900 dark:bg-[#111] text-neutral-100 border border-neutral-800 overflow-x-auto my-5 shadow-sm custom-scrollbar" {...props} />,
+                                  // FIX: Pre elements wrapped in max-w-full and overflow-x-auto to prevent blowing out flex width
+                                  pre: ({node, ...props}) => (
+                                    <div className="max-w-full overflow-x-auto my-5 rounded-xl border border-neutral-800 shadow-sm custom-scrollbar bg-neutral-900 dark:bg-[#111]">
+                                      <pre className="p-4 text-neutral-100 text-[13px] bg-transparent m-0" {...props} />
+                                    </div>
+                                  ),
                                   code: ({node, inline, ...props}: any) => 
                                     inline 
-                                      ? <code className="bg-neutral-100 dark:bg-neutral-800 text-black dark:text-white px-1.5 py-0.5 rounded-md text-[13px] font-mono border border-neutral-200 dark:border-neutral-700" {...props} /> 
+                                      ? <code className="bg-neutral-100 dark:bg-neutral-800 text-black dark:text-white px-1.5 py-0.5 rounded-md text-[13px] font-mono border border-neutral-200 dark:border-neutral-700 break-words" {...props} /> 
                                       : <code className="text-[13px] font-mono leading-relaxed" {...props} />,
+                                  // FIX: Table elements explicitly capped to max-w-full
                                   table: ({node, ...props}) => (
-                                    <div className="w-full overflow-x-auto my-6 rounded-xl border border-neutral-200 dark:border-neutral-800 shadow-sm bg-white dark:bg-[#0A0A0A]">
+                                    <div className="w-full overflow-x-auto my-6 rounded-xl border border-neutral-200 dark:border-neutral-800 shadow-sm bg-white dark:bg-[#0A0A0A] max-w-full">
                                       <table className="w-full text-sm text-left border-collapse" {...props} />
                                     </div>
                                   ),
@@ -455,7 +462,7 @@ export default function Assistant() {
                 ))}
                 
                 {isGenerating && (
-                  <div className="flex gap-3 sm:gap-4 animate-in fade-in duration-300">
+                  <div className="flex gap-3 sm:gap-4 animate-in fade-in duration-300 w-full min-w-0">
                     <div className="h-8 w-8 rounded-full bg-neutral-100 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 flex items-center justify-center shrink-0 mt-0.5">
                       <Sparkles className="h-4 w-4 text-black dark:text-white animate-pulse" />
                     </div>
@@ -470,8 +477,8 @@ export default function Assistant() {
             )}
           </div>
 
-          <div className="absolute bottom-0 left-0 right-0 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:p-6 sm:pb-8 bg-gradient-to-t from-white via-white/90 to-transparent dark:from-[#0A0A0A] dark:via-[#0A0A0A]/90 dark:to-transparent pointer-events-none z-20">
-            <div className="max-w-3xl mx-auto pointer-events-auto">
+          <div className="absolute bottom-0 left-0 right-0 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:p-6 sm:pb-8 bg-gradient-to-t from-white via-white/90 to-transparent dark:from-[#0A0A0A] dark:via-[#0A0A0A]/90 dark:to-transparent pointer-events-none z-20 w-full">
+            <div className="max-w-3xl mx-auto pointer-events-auto w-full">
               <div className="relative bg-white dark:bg-[#111] border border-neutral-200 dark:border-neutral-800 rounded-3xl shadow-lg dark:shadow-[0_8px_30px_rgb(0,0,0,0.5)] focus-within:ring-1 focus-within:ring-black dark:focus-within:ring-neutral-600 transition-all duration-300 flex flex-col overflow-hidden group">
                 
                 <textarea
