@@ -13,6 +13,9 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { toast } from "sonner";
 import { fetchAPI } from '@/lib/api';
 
+// Safely grab the API URL from environment variables
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+
 // --- HELPERS ---
 function formatBytes(bytes: number, decimals = 2) {
   if (!+bytes) return '0 Bytes';
@@ -35,8 +38,6 @@ const getFileIcon = (ext: string) => {
 };
 
 // --- SUB-COMPONENTS ---
-
-// 1. Folder Component
 const FolderCard = ({ folder, onClick, setRenameTarget, setNewName, setIsRenameModalOpen, handleDelete, handleMoveClick }: any) => {
   return (
     <div className="relative group h-full transition-opacity">
@@ -52,7 +53,6 @@ const FolderCard = ({ folder, onClick, setRenameTarget, setNewName, setIsRenameM
         <h3 className="font-semibold text-zinc-900 dark:text-zinc-100 text-sm truncate w-full pr-8">{folder.name}</h3>
       </button>
       
-      {/* Folder Three Dots */}
       <div className="absolute top-4 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -78,7 +78,6 @@ const FolderCard = ({ folder, onClick, setRenameTarget, setNewName, setIsRenameM
   );
 };
 
-// 2. File Row Component
 const FileRow = ({ file, onClick, setRenameTarget, setNewName, setIsRenameModalOpen, handleDelete, handleMoveClick }: any) => {
   const Icon = getFileIcon(file.extension);
 
@@ -142,6 +141,11 @@ export default function Drive() {
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   
+  // Loading states for actions
+  const [isCreatingFolder, setIsCreatingFolder] = useState(false);
+  const [isRenaming, setIsRenaming] = useState(false);
+  const [isMoving, setIsMoving] = useState(false);
+  
   // Navigation State
   const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
   const [breadcrumbs, setBreadcrumbs] = useState([{ id: null as string | null, name: 'Home' }]);
@@ -155,7 +159,6 @@ export default function Drive() {
   const [renameTarget, setRenameTarget] = useState<{id: string, name: string, type: 'file' | 'folder'} | null>(null);
   const [newName, setNewName] = useState('');
 
-  // Move Modal States
   const [isMoveModalOpen, setIsMoveModalOpen] = useState(false);
   const [moveTarget, setMoveTarget] = useState<{id: string, name: string, type: 'file' | 'folder'} | null>(null);
   const [moveCurrentFolderId, setMoveCurrentFolderId] = useState<string | null>(null);
@@ -163,7 +166,6 @@ export default function Drive() {
   const [moveFolderList, setMoveFolderList] = useState<any[]>([]);
   const [isLoadingMoveFolders, setIsLoadingMoveFolders] = useState(false);
 
-  // Fetch Data
   useEffect(() => { 
     fetchContents(currentFolderId); 
   }, [currentFolderId]);
@@ -184,11 +186,8 @@ export default function Drive() {
     }
   };
 
-  // Fetch folders for Move Modal Explorer
   useEffect(() => {
-    if (isMoveModalOpen) {
-      fetchMoveExplorerFolders(moveCurrentFolderId);
-    }
+    if (isMoveModalOpen) fetchMoveExplorerFolders(moveCurrentFolderId);
   }, [moveCurrentFolderId, isMoveModalOpen]);
 
   const fetchMoveExplorerFolders = async (folderId: string | null) => {
@@ -197,8 +196,6 @@ export default function Drive() {
       let url = '/drive/contents';
       if (folderId) url += `?folder_id=${folderId}`;
       const data = await fetchAPI(url);
-      
-      // Prevent a folder from being moved into itself
       const filteredFolders = (data.folders || []).filter((f: any) => f.id !== moveTarget?.id);
       setMoveFolderList(filteredFolders);
     } catch (err) {
@@ -208,9 +205,9 @@ export default function Drive() {
     }
   };
 
-  // --- ACTIONS ---
   const handleCreateFolder = async () => {
     if (!newFolderName.trim()) return;
+    setIsCreatingFolder(true);
     try {
       await fetchAPI('/drive/folders', {
         method: 'POST',
@@ -222,6 +219,8 @@ export default function Drive() {
       fetchContents(currentFolderId);
     } catch (err) {
       toast.error("Failed to create folder");
+    } finally {
+      setIsCreatingFolder(false);
     }
   };
 
@@ -237,7 +236,8 @@ export default function Drive() {
       if (currentFolderId) formData.append('folder_id', currentFolderId);
 
       const token = localStorage.getItem('docmosiss_token');
-      const res = await fetch('/drive/files/upload', {
+      // DYNAMIC URL - NO HARDCODING
+      const res = await fetch(`${API_URL}/drive/files/upload`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}` },
         body: formData
@@ -266,58 +266,50 @@ export default function Drive() {
 
   const handleRename = async () => {
     if (!renameTarget || !newName.trim()) return;
+    setIsRenaming(true);
     try {
-      const payload = renameTarget.type === 'file' 
-        ? { original_name: newName } 
-        : { name: newName };
-
+      const payload = renameTarget.type === 'file' ? { original_name: newName } : { name: newName };
       await fetchAPI(`/drive/${renameTarget.type}s/${renameTarget.id}`, {
         method: 'PATCH',
         body: JSON.stringify(payload)
       });
-      
       toast.success(`${renameTarget.type === 'file' ? 'File' : 'Folder'} renamed successfully!`);
       setIsRenameModalOpen(false);
       fetchContents(currentFolderId);
     } catch (err) {
       toast.error(`Failed to rename ${renameTarget.type}.`);
+    } finally {
+      setIsRenaming(false);
     }
   };
 
   const initMoveSequence = (target: {id: string, name: string, type: 'file' | 'folder'}) => {
     setMoveTarget(target);
-    setMoveCurrentFolderId(null); // Reset explorer to root
+    setMoveCurrentFolderId(null); 
     setMoveBreadcrumbs([{ id: null, name: 'Home' }]);
     setIsMoveModalOpen(true);
   };
 
   const handleMoveConfirm = async () => {
     if (!moveTarget) return;
+    setIsMoving(true);
     try {
-      // Backend expects "root" to set parent_id/folder_id to None
       const targetPayloadId = moveCurrentFolderId === null ? 'root' : moveCurrentFolderId;
-
       if (moveTarget.type === 'file') {
-        await fetchAPI(`/drive/files/${moveTarget.id}`, { 
-          method: 'PATCH', 
-          body: JSON.stringify({ folder_id: targetPayloadId }) 
-        });
+        await fetchAPI(`/drive/files/${moveTarget.id}`, { method: 'PATCH', body: JSON.stringify({ folder_id: targetPayloadId }) });
       } else {
-        await fetchAPI(`/drive/folders/${moveTarget.id}`, { 
-          method: 'PATCH', 
-          body: JSON.stringify({ parent_folder_id: targetPayloadId }) 
-        });
+        await fetchAPI(`/drive/folders/${moveTarget.id}`, { method: 'PATCH', body: JSON.stringify({ parent_folder_id: targetPayloadId }) });
       }
-      
       toast.success(`${moveTarget.type === 'file' ? 'File' : 'Folder'} moved successfully!`);
       setIsMoveModalOpen(false);
       fetchContents(currentFolderId);
     } catch (err) {
       toast.error(`Failed to move ${moveTarget.type}.`);
+    } finally {
+      setIsMoving(false);
     }
   };
 
-  // --- NAVIGATION HELPERS ---
   const navigateToFolder = (folderId: string, folderName: string) => {
     setCurrentFolderId(folderId);
     setBreadcrumbs([...breadcrumbs, { id: folderId, name: folderName }]);
@@ -329,7 +321,6 @@ export default function Drive() {
     setBreadcrumbs(breadcrumbs.slice(0, index + 1));
   };
 
-  // --- MOVE MODAL NAVIGATION HELPERS ---
   const moveNavigateDown = (folderId: string, folderName: string) => {
     setMoveCurrentFolderId(folderId);
     setMoveBreadcrumbs([...moveBreadcrumbs, { id: folderId, name: folderName }]);
@@ -346,7 +337,6 @@ export default function Drive() {
 
   return (
     <div className="max-w-6xl mx-auto space-y-8 p-4 sm:p-8 mt-4">
-      
       <input type="file" ref={fileInputRef} onChange={handleFileUpload} className="hidden" />
 
       {/* --- FOLDER CREATE MODAL --- */}
@@ -359,7 +349,9 @@ export default function Drive() {
           />
           <DialogFooter className="mt-6">
             <Button variant="outline" onClick={() => setIsFolderModalOpen(false)}>Cancel</Button>
-            <Button onClick={handleCreateFolder} className="bg-emerald-600 hover:bg-emerald-700 text-white">Create</Button>
+            <Button onClick={handleCreateFolder} disabled={isCreatingFolder || !newFolderName.trim()} className="bg-emerald-600 hover:bg-emerald-700 text-white">
+              {isCreatingFolder && <Loader2 className="h-4 w-4 mr-2 animate-spin" />} Create
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -374,7 +366,9 @@ export default function Drive() {
           />
           <DialogFooter className="mt-6">
             <Button variant="outline" onClick={() => setIsRenameModalOpen(false)}>Cancel</Button>
-            <Button onClick={handleRename} className="bg-emerald-600 hover:bg-emerald-700 text-white">Save</Button>
+            <Button onClick={handleRename} disabled={isRenaming || !newName.trim()} className="bg-emerald-600 hover:bg-emerald-700 text-white">
+              {isRenaming && <Loader2 className="h-4 w-4 mr-2 animate-spin" />} Save
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -385,13 +379,7 @@ export default function Drive() {
           <DialogHeader><DialogTitle>Move "{moveTarget?.name}"</DialogTitle></DialogHeader>
           
           <div className="flex items-center gap-3 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-2 rounded-lg mt-2">
-            <Button 
-              variant="outline" 
-              size="icon" 
-              className="h-8 w-8" 
-              onClick={moveNavigateUp} 
-              disabled={moveBreadcrumbs.length <= 1}
-            >
+            <Button variant="outline" size="icon" className="h-8 w-8" onClick={moveNavigateUp} disabled={moveBreadcrumbs.length <= 1}>
               <ChevronLeft className="h-4 w-4" />
             </Button>
             <span className="text-sm font-medium text-zinc-900 dark:text-zinc-100 flex-1 truncate">
@@ -409,11 +397,7 @@ export default function Drive() {
               </div>
             ) : (
               moveFolderList.map(f => (
-                <div 
-                  key={f.id} 
-                  onClick={() => moveNavigateDown(f.id, f.name)}
-                  className="flex justify-between items-center p-3 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-md cursor-pointer transition-colors"
-                >
+                <div key={f.id} onClick={() => moveNavigateDown(f.id, f.name)} className="flex justify-between items-center p-3 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-md cursor-pointer transition-colors">
                   <div className="flex items-center gap-3">
                     <Folder className="h-5 w-5 text-zinc-400" />
                     <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">{f.name}</span>
@@ -426,8 +410,8 @@ export default function Drive() {
 
           <DialogFooter className="mt-4 flex justify-between sm:justify-between">
             <Button variant="outline" onClick={() => setIsMoveModalOpen(false)}>Cancel</Button>
-            <Button onClick={handleMoveConfirm} className="bg-emerald-600 hover:bg-emerald-700 text-white">
-              Move Here
+            <Button onClick={handleMoveConfirm} disabled={isMoving} className="bg-emerald-600 hover:bg-emerald-700 text-white">
+              {isMoving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />} Move Here
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -495,14 +479,9 @@ export default function Drive() {
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 {folders.filter(f => f.name.toLowerCase().includes(searchQuery.toLowerCase())).map((folder) => (
                   <FolderCard 
-                    key={folder.id} 
-                    folder={folder}
-                    onClick={() => navigateToFolder(folder.id, folder.name)}
-                    setRenameTarget={setRenameTarget}
-                    setNewName={setNewName}
-                    setIsRenameModalOpen={setIsRenameModalOpen}
-                    handleDelete={handleDelete}
-                    handleMoveClick={initMoveSequence}
+                    key={folder.id} folder={folder} onClick={() => navigateToFolder(folder.id, folder.name)}
+                    setRenameTarget={setRenameTarget} setNewName={setNewName} setIsRenameModalOpen={setIsRenameModalOpen}
+                    handleDelete={handleDelete} handleMoveClick={initMoveSequence}
                   />
                 ))}
               </div>
@@ -533,14 +512,9 @@ export default function Drive() {
                       <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800/50">
                         {files.filter(f => f.original_name.toLowerCase().includes(searchQuery.toLowerCase())).map((file) => (
                           <FileRow 
-                            key={file.id} 
-                            file={file} 
-                            onClick={() => navigate(`/dashboard/drive/${file.id}`)}
-                            setRenameTarget={setRenameTarget}
-                            setNewName={setNewName}
-                            setIsRenameModalOpen={setIsRenameModalOpen}
-                            handleDelete={handleDelete}
-                            handleMoveClick={initMoveSequence}
+                            key={file.id} file={file} onClick={() => navigate(`/dashboard/drive/${file.id}`)}
+                            setRenameTarget={setRenameTarget} setNewName={setNewName} setIsRenameModalOpen={setIsRenameModalOpen}
+                            handleDelete={handleDelete} handleMoveClick={initMoveSequence}
                           />
                         ))}
                       </tbody>

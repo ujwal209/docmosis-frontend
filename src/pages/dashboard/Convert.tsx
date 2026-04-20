@@ -11,6 +11,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { fetchAPI } from '@/lib/api';
 import { toast } from "sonner";
 
+// Safely grab the API URL from environment variables
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+
 // --- CONVERSION TOOLS DATA (PDF to Word removed) ---
 const CONVERSION_TOOLS = [
   {
@@ -99,7 +102,7 @@ export default function Convert() {
     setSelectedFiles(prev => prev.some(f => f.id === file.id) ? prev.filter(f => f.id !== file.id) : [...prev, file]);
   };
 
-  // NEW: Manual Local Upload Logic
+  // MANUAL LOCAL UPLOAD LOGIC
   const handleLocalUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -112,8 +115,8 @@ export default function Convert() {
       formData.append('file', file);
 
       const token = localStorage.getItem('docmosiss_token');
-      // Hardcoded to the FastAPI default port based on your setup
-      const res = await fetch('http://127.0.0.1:8000/drive/files/upload', {
+      // DYNAMIC URL - NO HARDCODING
+      const res = await fetch(`${API_URL}/drive/files/upload`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}` },
         body: formData
@@ -126,7 +129,6 @@ export default function Convert() {
 
       toast.success(`${file.name} uploaded!`);
       
-      // Auto-add to selected files and refresh drive files silently
       setSelectedFiles(prev => [...prev, newFile]);
       fetchDriveFiles(); 
 
@@ -176,7 +178,6 @@ export default function Convert() {
   return (
     <div className="max-w-6xl mx-auto p-4 sm:p-8 mt-4 space-y-10">
       
-      {/* Hidden File Input for Manual Upload */}
       <input type="file" ref={fileInputRef} onChange={handleLocalUpload} className="hidden" />
 
       {/* DRIVE MODAL */}
@@ -222,8 +223,6 @@ export default function Convert() {
       {/* --- STEP 1: CLEAN PROFESSIONAL HERO & CENTERED GRID --- */}
       {step === 1 && (
         <div className="animate-in fade-in zoom-in-95 duration-500">
-          
-          {/* Professional Hero Section */}
           <div className="bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-10 sm:p-16 text-center shadow-sm mb-12">
             <div className="max-w-2xl mx-auto space-y-6">
               <Badge variant="secondary" className="bg-zinc-100 text-zinc-600 dark:bg-zinc-900 dark:text-zinc-400">Processing Engine v1.0</Badge>
@@ -233,8 +232,6 @@ export default function Convert() {
               <p className="text-zinc-500 dark:text-zinc-400 text-base">
                 Search and select a tool below to process your documents securely.
               </p>
-              
-              {/* Centered Search Bar */}
               <div className="relative max-w-md mx-auto mt-8">
                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                   <Search className="h-4 w-4 text-zinc-400" />
@@ -249,7 +246,6 @@ export default function Convert() {
             </div>
           </div>
 
-          {/* Centered Tools Grid */}
           <div className="max-w-4xl mx-auto">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-4">
               {filteredTools.map((tool) => {
@@ -312,7 +308,6 @@ export default function Convert() {
                     <p className="font-medium text-zinc-900 dark:text-zinc-200 mb-1">No files selected</p>
                     <p className="text-sm text-zinc-500 mb-6 max-w-xs">Upload from your computer or pick files already in your Drive.</p>
                     
-                    {/* DUAL ACTION BUTTONS */}
                     <div className="flex flex-col sm:flex-row items-center gap-3">
                       <Button 
                         onClick={() => fileInputRef.current?.click()} 
@@ -346,7 +341,6 @@ export default function Convert() {
                       </div>
                     ))}
                     
-                    {/* DUAL ADD BUTTONS */}
                     <div className="grid grid-cols-2 gap-3 pt-2">
                       <Button variant="outline" className="border-dashed" onClick={() => setIsDriveModalOpen(true)}>
                         <HardDrive className="h-4 w-4 mr-2 text-zinc-500" /> Add from Drive
@@ -365,7 +359,6 @@ export default function Convert() {
                 <div className="bg-zinc-50 dark:bg-zinc-900/50 p-5 rounded-xl border border-zinc-200 dark:border-zinc-800">
                   <h4 className="font-medium text-zinc-900 dark:text-zinc-100 mb-4">Process Configuration</h4>
                   
-                  {/* Dynamic Password Field for Lock/Unlock */}
                   {['lock-pdf', 'unlock-pdf'].includes(activeTool.id) && (
                     <div className="mb-6 space-y-2 border-b border-zinc-200 dark:border-zinc-800 pb-6">
                       <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
