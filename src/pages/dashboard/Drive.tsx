@@ -237,7 +237,7 @@ export default function Drive() {
       if (currentFolderId) formData.append('folder_id', currentFolderId);
 
       const token = localStorage.getItem('docmosiss_token');
-      const res = await fetch('http://127.0.0.1:8000/drive/files/upload', {
+      const res = await fetch('/drive/files/upload', {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}` },
         body: formData
